@@ -1,0 +1,14 @@
+actions:
+  - name: show-repository-head
+    kind: Portal
+    description: Show the current Git commit of this repository portal.
+    inputs: {type: object, additionalProperties: false}
+    unverified: true
+    executor:
+      type: command
+      run:
+        - sh
+        - -ec
+        - |
+          commit=$(git rev-parse HEAD)
+          printf '{"commit":"%s"}\n' "$commit"

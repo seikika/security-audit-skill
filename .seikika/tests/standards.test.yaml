@@ -1,0 +1,39 @@
+# What each starter rule means, over four made-up repositories (fixtures/workspace.ndjson): one
+# team-owned at silver, one personal-maintainer at silver, one with a mixed CODEOWNERS and no
+# licence, one with almost nothing.
+name: standards
+assert:
+  - name: >-
+      a README, a team-only CODEOWNERS with a catch-all, and a licence reach
+      silver
+    expect: >-
+      score('repo-hygiene', 'repository:acme/platform-infra').level ==
+      'silver'
+  - name: >-
+      a personal handle alone with a catch-all and a licence also reaches
+      silver
+    expect: >-
+      score('repo-hygiene', 'repository:logan/solo-tool').level == 'silver'
+  - name: >-
+      mixing a team with an individual stops at bronze, and the evidence names
+      the individual
+    expect: >-
+      score('repo-hygiene', 'repository:acme/payments-api').level == 'bronze'
+      && score('repo-hygiene',
+      'repository:acme/payments-api').evidence['owners-are-teams'] ==
+      ['@alice'] && score('repo-hygiene',
+      'repository:acme/payments-api').rules['has-license'] == 'fail'
+  - name: a short README and no CODEOWNERS fail bronze
+    expect: >-
+      score('repo-hygiene', 'repository:acme/legacy-tool').level == 'none' &&
+      score('repo-hygiene', 'repository:acme/legacy-tool').rules['has-readme']
+      == 'fail' && score('repo-hygiene',
+      'repository:acme/legacy-tool').rules['has-codeowners'] == 'fail'
+  - name: owners are collected across CODEOWNERS rules
+    expect: >-
+      entity('repository:acme/payments-api').owners == ['@acme/payments',
+      '@alice']
+  - name: broken relative links fail the docs scorecard
+    expect: >-
+      score('docs', 'doc:README.md').evidence['links-resolve'] ==
+      ['docs/runbook.md']

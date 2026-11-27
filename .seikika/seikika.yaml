@@ -1,0 +1,186 @@
+# A starter repo portal (docs/design/repo-portals.md). Copy this file to `.seikika/seikika.yaml` in a
+# repository, add the `seikika report` GitHub Action (actions/report), and the repository is scored
+# on every push with a ratchet: nothing may get worse than the committed `.seikika/results.json`.
+#
+# `repo-hygiene` is stage 1 of the CODEOWNERS graduation example in docs/design/federation.md §6: a
+# standard one team runs in its own repos before it is proposed for the company.
+apiVersion: seikika.com/v1alpha1
+
+portal:
+  name: security-audit-skill
+  title: Security Audit Skill
+  owner: group:maintainers
+  seikika: "0.1"
+
+include: [actions/*.yaml]
+
+federation:
+  runner: {type: local}
+
+connectors:
+  - name: workspace
+    package: builtin:workspace # reads the checkout; no network, no build
+    runtime: in-image
+    config:
+      root: .
+      crates: false # set true in a Rust workspace for per-crate metrics
+      repo: true # README, LICENSE, CODEOWNERS
+      docs: ["*.md", docs/**/*.md]
+    records: [repo, doc]
+    refresh: {repo: [external_ids], doc: [external_ids]}
+    freshness: {repo: 5m, doc: 5m}
+
+kinds:
+  - name: Repository
+    identityFrom: [connector:workspace]
+    fields:
+      name: {type: string}
+      files: {type: list, items: string}
+      readme: {type: string}
+      readmeWords: {type: integer}
+      license: {type: string}
+      codeowners: {type: object} # {path, rules: [{pattern, owners, line}]}
+      owners: {type: list, items: string} # every owner CODEOWNERS names (sorted, unique)
+      ownersOk:
+        type: boolean
+        description: >-
+          True when every CODEOWNERS owner is a GitHub team (@org/team), or every
+          owner is a personal handle (@user). False when empty, mixed, or an
+          email.
+    sources: {default: [connector:workspace]}
+    map:
+    - from: workspace/repo
+      id: "'repository:' + record.name"
+      set: >-
+        {'name': record.name, 'files': record.files, 'readme': record.readme,
+         'readmeWords': record.readmeWords, 'license': record.license,
+         'codeowners': record.codeowners, 'owners': record.owners, 'ownersOk':
+         record.ownersOk}
+
+  - name: Doc
+    identityFrom: [connector:workspace]
+    fields:
+      path: {type: string}
+      title: {type: string}
+      brokenLinks: {type: list, items: string}
+    sources: {default: [connector:workspace]}
+    map:
+    - from: workspace/doc
+      id: "'doc:' + record.path"
+      set: >-
+        {'path': record.path, 'title': record.title, 'brokenLinks':
+        record.brokenLinks}
+
+scorecards:
+  - name: repo-hygiene
+    title: Repository basics
+    kind: Repository
+    description: >-
+      This repository's basics: a README and CODEOWNERS, then a catch-all
+      owner, owners that are teams and a licence.
+    rationale: >-
+      These files tell a newcomer or an agent what the repository is, who
+      reviews changes to it, and whether its code may be reused, and they can
+      be checked in any repository with no build or network. Bronze is a
+      README and a CODEOWNERS file; silver makes ownership complete and
+      unambiguous and adds a licence.
+    links:
+    - title: Repo portals
+      url: https://github.com/seikika/seikika/blob/main/docs/design/repo-portals.md
+    - title: GitHub code owners
+      url: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+    owner: group:maintainers
+    levels: [bronze, silver]
+    rules:
+    - name: has-readme
+      level: bronze
+      check: has(entity.readme) && entity.readmeWords >= 50
+      evidence: >-
+        has(entity.readme) ? [entity.readme + ' has ' +
+        string(entity.readmeWords) + ' words'] : ['no README']
+      fix: >-
+        Add a README of at least 50 words: what this is, how to run it, who owns
+        it.
+      rationale: >-
+        The README is the first thing a person or an agent reads to learn what a
+        repository is and how to run it; without one they reverse-engineer it
+        from the code.
+    - name: has-codeowners
+      level: bronze
+      check: has(entity.codeowners)
+      evidence: "['no CODEOWNERS in .github/, the root or docs/']"
+      fix: Add .github/CODEOWNERS so changes are routed to an owning team.
+      rationale: >-
+        Without CODEOWNERS, GitHub requests no reviewer for a pull request and
+        nothing in the repository says who owns the code.
+    - name: codeowners-catch-all
+      level: silver
+      check: >-
+        has(entity.codeowners) && entity.codeowners.rules.exists(r, r.pattern ==
+        '*')
+      evidence: "has(entity.codeowners) ? entity.codeowners.rules.map(r, r.pattern) : []"
+      fix: Start CODEOWNERS with a `*` rule so every path has an owner.
+      rationale: >-
+        A path no rule matches has no owner, so changes to it get no automatic
+        reviewer. A leading catch-all gives every path a default that later,
+        more specific rules override.
+    - name: owners-are-teams
+      level: silver
+      check: entity.owners.size() > 0 && entity.ownersOk
+      evidence: >-
+        entity.owners.filter(o, !o.startsWith('@')).size() > 0 ?
+        entity.owners.filter(o, !o.startsWith('@')) : entity.owners.filter(o,
+        !o.contains('/'))
+      fix: >-
+        Name teams (@org/team), or for a single-maintainer repository only
+        personal handles (@user). Do not mix teams with individuals, and do not
+        use emails.
+      rationale: >-
+        A team keeps ownership when people leave; a mix of teams and
+        individuals, or an email, leaves it unclear who answers for the code.
+        All-personal handles are accepted so a single-maintainer repository can
+        reach silver.
+      links:
+      - title: Personal CODEOWNERS decision
+        url: https://github.com/seikika/seikika/blob/main/docs/decisions/D01M7Y57FVX0XYNGMX0A0XJ4GK9.md
+    - name: has-license
+      level: silver
+      check: has(entity.license)
+      evidence: "['no LICENSE or COPYING file at the root']"
+      fix: >-
+        Add a LICENSE file (or a note in the README if the code is
+        internal-only).
+      rationale: >-
+        Without a licence, default copyright applies and nobody else may legally
+        use, change or share the code, even in a public repository.
+      links:
+      - title: Licensing a repository
+        url: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository
+    facets: {summary: public, details: public}
+
+  - name: docs
+    title: Docs with working links
+    kind: Doc
+    description: >-
+      Each Markdown document in this repository: links that resolve.
+    rationale: >-
+      Markdown docs are how a repository explains itself to people and agents.
+      Resolving links can be checked in any repository with no build or
+      network, so that is where the starter begins.
+    links:
+    - title: Repo portal starter
+      url: https://github.com/seikika/seikika/blob/main/examples/repo-portal-starter/README.md
+    owner: group:maintainers
+    levels: [bronze]
+    rules:
+    - name: links-resolve
+      level: bronze
+      check: entity.brokenLinks.size() == 0
+      evidence: entity.brokenLinks
+      fix: Fix or remove the relative links in the evidence.
+      rationale: >-
+        Moving or renaming a file breaks the links to it without failing any
+        build; the reader finds out by following a dead link.
+    facets: {summary: public, details: public}
+
+tests: [tests/standards.test.yaml]
