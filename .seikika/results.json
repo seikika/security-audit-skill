@@ -1,0 +1,28 @@
+{
+  "evidence": {
+    "repo-hygiene": {
+      "repository:seikika/security-audit-skill": {
+        "codeowners-catch-all": [
+          "026b3610"
+        ],
+        "has-codeowners": [
+          "c681d9ee"
+        ]
+      }
+    }
+  },
+  "format": "seikika-report/v1",
+  "portal": "repo",
+  "results": {
+    "repo-hygiene": {
+      "repository:seikika/security-audit-skill": {
+        "failing": {
+          "codeowners-catch-all": 1,
+          "has-codeowners": 1,
+          "owners-are-teams": 0
+        },
+        "level": "none"
+      }
+    }
+  }
+}

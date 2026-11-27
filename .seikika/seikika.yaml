@@ -1,0 +1,131 @@
+apiVersion: seikika.com/v1alpha1
+
+portal:
+  name: repo
+  title: Repository standards
+  owner: group:maintainers
+  seikika: "0.2"
+
+connectors:
+  - name: workspace
+    package: builtin:workspace
+    runtime: in-image
+    config: {root: ., crates: false, repo: true}
+    records: [repo]
+    refresh: {repo: [external_ids]}
+    freshness: {repo: 5m}
+
+kinds:
+  - name: Repository
+    identityFrom: [connector:workspace]
+    fields:
+      name: {type: string}
+      scanned: {type: boolean}
+      readme: {type: string}
+      readmeWords: {type: integer}
+      license: {type: string}
+      codeowners: {type: object}
+      owners: {type: list, items: string}
+      ownersOk: {type: boolean}
+    sources: {default: [connector:workspace]}
+    map:
+    - from: workspace/repo
+      id: "'repository:' + record.name"
+      set: >-
+        {'name': record.name, 'scanned': true, 'readme': record.readme,
+        'readmeWords': record.readmeWords, 'license': record.license,
+        'codeowners': record.codeowners, 'owners': record.owners, 'ownersOk':
+        record.ownersOk}
+
+scorecards:
+  - name: repo-hygiene
+    title: Repository basics
+    kind: Repository
+    description: >-
+      This repository's basics: a README and CODEOWNERS, then a catch-all
+      owner, owners that are teams and a licence.
+    rationale: >-
+      These files tell a newcomer or an agent what the repository is, who
+      reviews changes to it, and whether its code may be reused, and they can
+      be checked in any repository with no build or network. Bronze is a
+      README and a CODEOWNERS file; silver makes ownership complete and
+      unambiguous and adds a licence.
+    links:
+    - title: Repo portals
+      url: https://github.com/seikika/seikika/blob/main/docs/design/repo-portals.md
+    - title: GitHub code owners
+      url: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+    owner: group:maintainers
+    appliesTo: entity.scanned
+    levels: [bronze, silver]
+    rules:
+    - name: has-readme
+      level: bronze
+      check: has(entity.readme) && entity.readmeWords >= 50
+      evidence: >-
+        has(entity.readme) ? [entity.readme + ' has ' +
+        string(entity.readmeWords) + ' words'] : ['no README']
+      fix: >-
+        Add a README of at least 50 words: what this is, how to run it, who owns
+        it.
+      rationale: >-
+        The README is the first thing a person or an agent reads to learn what a
+        repository is and how to run it; without one they reverse-engineer it
+        from the code.
+    - name: has-codeowners
+      level: bronze
+      check: >-
+        has(entity.codeowners) && entity.codeowners.rules.exists(r,
+        r.owners.size() > 0)
+      evidence: "['no CODEOWNERS rule with an owner in .github/, the root or docs/']"
+      fix: Add .github/CODEOWNERS so changes are routed to an owning team.
+      rationale: >-
+        Without CODEOWNERS, GitHub requests no reviewer for a pull request and
+        nothing in the repository says who owns the code.
+    - name: codeowners-catch-all
+      level: silver
+      check: >-
+        has(entity.codeowners) && entity.codeowners.rules.size() > 0 &&
+        entity.codeowners.rules[0].pattern == '*' &&
+        entity.codeowners.rules[0].owners.size() > 0
+      evidence: "['The first CODEOWNERS rule must be * with at least one owner']"
+      fix: Start CODEOWNERS with a `*` rule so every path has an owner.
+      rationale: >-
+        A path no rule matches has no owner, so changes to it get no automatic
+        reviewer. A leading catch-all gives every path a default that later,
+        more specific rules override.
+    - name: owners-are-teams
+      level: silver
+      check: >-
+        entity.owners.size() > 0 && entity.ownersOk && entity.owners.all(o,
+        o.matches('^@[a-zA-Z0-9][a-zA-Z0-9-]*(/[a-zA-Z0-9][a-zA-Z0-9_-]*)?$'))
+      evidence: >-
+        entity.owners.filter(o, !o.startsWith('@')).size() > 0 ?
+        entity.owners.filter(o, !o.startsWith('@')) : entity.owners.filter(o,
+        !o.contains('/'))
+      fix: >-
+        Name teams (@org/team), or for a single-maintainer repository only
+        personal handles (@user). Do not mix teams with individuals, and do not
+        use emails.
+      rationale: >-
+        A team keeps ownership when people leave; a mix of teams and
+        individuals, or an email, leaves it unclear who answers for the code.
+        All-personal handles are accepted so a single-maintainer repository can
+        reach silver.
+      links:
+      - title: Personal CODEOWNERS decision
+        url: https://github.com/seikika/seikika/blob/main/docs/decisions/D01M7Y57FVX0XYNGMX0A0XJ4GK9.md
+    - name: has-license
+      level: silver
+      check: has(entity.license)
+      evidence: "['no LICENSE or COPYING file at the root']"
+      fix: >-
+        Add a LICENSE file (or a note in the README if the code is
+        internal-only).
+      rationale: >-
+        Without a licence, default copyright applies and nobody else may legally
+        use, change or share the code, even in a public repository.
+      links:
+      - title: Licensing a repository
+        url: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository
+    facets: {summary: public, details: public}
