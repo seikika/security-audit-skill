@@ -1,0 +1,152 @@
+{
+  "actions": [],
+  "campaigns": {},
+  "catalog": {
+    "Repository": [
+      "repository:seikika/security-audit-skill"
+    ]
+  },
+  "children": [],
+  "comparisons": {},
+  "entities": {
+    "repository:seikika/security-audit-skill": {
+      "fields": {
+        "license": "LICENSE",
+        "name": "seikika/security-audit-skill",
+        "owners": [],
+        "ownersOk": false,
+        "readme": "README.md",
+        "readmeWords": 884,
+        "scanned": true
+      },
+      "provenance": {
+        "license": "connector:workspace",
+        "name": "connector:workspace",
+        "owners": "connector:workspace",
+        "ownersOk": "connector:workspace",
+        "readme": "connector:workspace",
+        "readmeWords": "connector:workspace",
+        "scanned": "connector:workspace"
+      },
+      "relations": {
+        "in": [],
+        "out": []
+      }
+    }
+  },
+  "entityOverview": {
+    "repository:seikika/security-audit-skill": {
+      "name": "seikika/security-audit-skill"
+    }
+  },
+  "kindGroups": [],
+  "kinds": {
+    "Repository": {
+      "description": null,
+      "title": null
+    }
+  },
+  "organization": null,
+  "portal": "Repository standards",
+  "repoRollup": null,
+  "scorecards": {
+    "repo-hygiene": {
+      "appliesTo": "entity.scanned",
+      "description": "This repository's basics: a README and CODEOWNERS, then a catch-all owner, owners that are teams and a licence.",
+      "kind": "Repository",
+      "levels": [
+        "bronze",
+        "silver"
+      ],
+      "links": [
+        {
+          "title": "Repo portals",
+          "url": "https://github.com/seikika/seikika/blob/main/docs/design/repo-portals.md"
+        },
+        {
+          "title": "GitHub code owners",
+          "url": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners"
+        }
+      ],
+      "owner": "group:maintainers",
+      "rationale": "These files tell a newcomer or an agent what the repository is, who reviews changes to it, and whether its code may be reused, and they can be checked in any repository with no build or network. Bronze is a README and a CODEOWNERS file; silver makes ownership complete and unambiguous and adds a licence.",
+      "rules": {
+        "codeowners-catch-all": {
+          "basis": "measured",
+          "check": "has(entity.codeowners) && entity.codeowners.rules.size() > 0 && entity.codeowners.rules[0].pattern == '*' && entity.codeowners.rules[0].owners.size() > 0",
+          "fix": "Start CODEOWNERS with a `*` rule so every path has an owner.",
+          "level": "silver",
+          "rationale": "A path no rule matches has no owner, so changes to it get no automatic reviewer. A leading catch-all gives every path a default that later, more specific rules override."
+        },
+        "has-codeowners": {
+          "basis": "measured",
+          "check": "has(entity.codeowners) && entity.codeowners.rules.exists(r, r.owners.size() > 0)",
+          "fix": "Add .github/CODEOWNERS so changes are routed to an owning team.",
+          "level": "bronze",
+          "rationale": "Without CODEOWNERS, GitHub requests no reviewer for a pull request and nothing in the repository says who owns the code."
+        },
+        "has-license": {
+          "basis": "measured",
+          "check": "has(entity.license)",
+          "fix": "Add a LICENSE file (or a note in the README if the code is internal-only).",
+          "level": "silver",
+          "links": [
+            {
+              "title": "Licensing a repository",
+              "url": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository"
+            }
+          ],
+          "rationale": "Without a licence, default copyright applies and nobody else may legally use, change or share the code, even in a public repository."
+        },
+        "has-readme": {
+          "basis": "measured",
+          "check": "has(entity.readme) && entity.readmeWords >= 50",
+          "fix": "Add a README of at least 50 words: what this is, how to run it, who owns it.",
+          "level": "bronze",
+          "rationale": "The README is the first thing a person or an agent reads to learn what a repository is and how to run it; without one they reverse-engineer it from the code."
+        },
+        "owners-are-teams": {
+          "basis": "measured",
+          "check": "entity.owners.size() > 0 && entity.ownersOk && entity.owners.all(o, o.matches('^@[a-zA-Z0-9][a-zA-Z0-9-]*(/[a-zA-Z0-9][a-zA-Z0-9_-]*)?$'))",
+          "fix": "Name teams (@org/team), or for a single-maintainer repository only personal handles (@user). Do not mix teams with individuals, and do not use emails.",
+          "level": "silver",
+          "links": [
+            {
+              "title": "Personal CODEOWNERS decision",
+              "url": "https://github.com/seikika/seikika/blob/main/docs/decisions/D01M7Y57FVX0XYNGMX0A0XJ4GK9.md"
+            }
+          ],
+          "rationale": "A team keeps ownership when people leave; a mix of teams and individuals, or an email, leaves it unclear who answers for the code. All-personal handles are accepted so a single-maintainer repository can reach silver."
+        }
+      },
+      "title": "Repository basics",
+      "track": null
+    }
+  },
+  "scores": {
+    "repo-hygiene": {
+      "repository:seikika/security-audit-skill": {
+        "evidence": {
+          "codeowners-catch-all": [
+            "The first CODEOWNERS rule must be * with at least one owner"
+          ],
+          "has-codeowners": [
+            "no CODEOWNERS rule with an owner in .github/, the root or docs/"
+          ],
+          "owners-are-teams": []
+        },
+        "level": "none",
+        "rules": {
+          "codeowners-catch-all": "fail",
+          "has-codeowners": "fail",
+          "has-license": "pass",
+          "has-readme": "pass",
+          "owners-are-teams": "fail"
+        }
+      }
+    }
+  },
+  "snapshot": "1",
+  "tracks": {},
+  "unassessed": {}
+}
