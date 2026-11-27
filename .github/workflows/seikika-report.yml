@@ -1,0 +1,17 @@
+name: Seikika report
+on:
+  push:
+    branches: [seikika/portal]
+  pull_request:
+    branches: [seikika/portal]
+permissions: {contents: read}
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with: {persist-credentials: false}
+    - uses: seikika/seikika/actions/report@a732b573ce8715197e637dc151d92d3daa1f88ef # v0.2.1
+      with: {seikika-version: 0.2.1}
+      env:
+        GH_TOKEN: ${{ github.token }}
